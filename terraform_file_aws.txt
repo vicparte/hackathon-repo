@@ -1,0 +1,96 @@
+provider "aws" {
+  region = "ap-south-1"
+}
+
+resource "aws_instance" "Web_instance" {
+  ami                    = "ami-06f621d90fa29f6d0"
+  key_name               = "amazon_key"
+  instance_type          = "t2.micro"
+  subnet_id              = aws_subnet.demo-subnet.id
+  vpc_security_group_ids = [aws_security_group.demo-vpc-sg.id]
+
+
+  tags = {
+    Name = "Web_instance"
+  }
+}
+
+//create vpc
+resource "aws_vpc" "demo-vpc" {
+  cidr_block       = "10.10.0.0/16"
+  instance_tenancy = "default"
+
+  tags = {
+    Name = "demo-vpc"
+  }
+}
+
+// create subnet
+resource "aws_subnet" "demo-subnet" {
+  vpc_id                  = aws_vpc.demo-vpc.id
+  cidr_block              = "10.10.0.0/24"
+  map_public_ip_on_launch = "true"
+  tags = {
+    Name = "demo-subnet"
+  }
+}
+
+//Create Internet Gateway
+
+resource "aws_internet_gateway" "demo-igw" {
+  vpc_id = aws_vpc.demo-vpc.id
+
+  tags = {
+    Name = "demo-igw"
+  }
+}
+
+//Route table
+resource "aws_route_table" "demo-rt" {
+  vpc_id = aws_vpc.demo-vpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.demo-igw.id
+  }
+
+  tags = {
+    Name = "demo-rt"
+  }
+}
+
+// association of subnet to route table
+
+resource "aws_route_table_association" "demo-rt-association" {
+  subnet_id      = aws_subnet.demo-subnet.id
+  route_table_id = aws_route_table.demo-rt.id
+}
+
+// security group
+
+resource "aws_security_group" "demo-vpc-sg" {
+  name        = "demo-vpc-sg"
+  description = "Allow TLS inbound traffic"
+  vpc_id      = aws_vpc.demo-vpc.id
+
+  ingress {
+    description      = "TLS from VPC"
+    from_port        = 22
+    to_port          = 22
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  tags = {
+    Name = "demo-vpc-sg"
+  }
+}
